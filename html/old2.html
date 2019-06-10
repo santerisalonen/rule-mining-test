@@ -1,0 +1,116 @@
+<html>
+<head>
+</head>
+
+<body>
+<style>
+  .edges line {
+    stroke-width: 1;
+    stroke-linecap: round;
+    opacity: 0.2;
+  }
+  .edges line.activeTarget {
+    opacity:0.4;
+    stroke-width:2;
+    stroke: red;
+  }
+  .edges line.activeSource {
+    opacity:0.4;
+    stroke-width:2;
+    stroke: green;
+  }
+</style>
+<!-- Load d3.js -->
+<svg width="600" height="400" style="border:1px solid red" id="network"></svg>
+<script src="d3.v4.js"></script>
+<script src="out.js"></script>
+<script>
+// create graph
+var graph = {
+  nodes : [],
+  links : [],
+  rules : []
+}
+products.map(function(p){
+  graph.nodes.push({
+    id : p.product_id,
+    name : p.product_id,
+    group : p.group_0,
+    radius : Math.sqrt(Math.max(5, p.count / 100)),
+  });
+})
+links.map(function(l){
+  graph.links.push({
+    source : l.link[0],
+    target : l.link[1],
+  })
+})
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+
+
+var link = svg.append("g")
+  .attr("class", "edges")
+  .style("stroke", "#aaa")
+  .selectAll("line")
+  .data(graph.links)
+  .enter().append("line")
+  .attr('target', function(d) { return d.target})
+  .attr('source', function(d) { return d.source})
+
+
+var node = svg.append("g")
+  .attr("class", "nodes")
+  .selectAll("circle")
+  .data(graph.nodes)
+  .enter().append("circle")
+  .attr("label", function(d) {  return d.name; })
+  .attr("r", function(d){  return d.radius; })
+  .style('fill', 'white')
+  .style('stroke', 'black')
+
+node.on("mouseover", function(e){
+  d3.selectAll('.edges line[target="'+e.id+'"]').classed("activeTarget", true);
+  d3.selectAll('.edges line[source="'+e.id+'"]').classed('activeTarget', false)
+});
+node.on("mouseout", function(e){
+  d3.selectAll('.edges line[target="'+e.id+'"]').classed('activeTarget', false)
+  d3.selectAll('.edges line[source="'+e.id+'"]').classed('activeTarget', false)
+});
+
+
+
+var simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; })
+      .strength(0.05)
+    )
+    .force("charge", d3.forceManyBody().strength(-400))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collide", d3.forceCollide().radius(function(d) {
+        return d.radius + 1;
+    }).iterations(1))
+    .nodes(graph.nodes).on("tick", ticked)
+    .force("link").links(graph.links);
+
+function ticked() {
+  link
+    .attr("x1", function(d) { return d.source.x; })
+    .attr("y1", function(d) { return d.source.y; })
+    .attr("x2", function(d) { return d.target.x; })
+    .attr("y2", function(d) { return d.target.y; });
+  node
+   .attr("cx", function (d) {
+     return d.x = Math.max(d.radius, Math.min(width - d.radius, d.x));
+   })
+   .attr("cy", function (d) {
+     return d.y = Math.max(d.radius, Math.min(height - d.radius, d.y));
+   });
+}
+
+
+</script>
+</body>
+</html>

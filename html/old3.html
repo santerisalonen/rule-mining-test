@@ -1,0 +1,184 @@
+<html>
+<head>
+</head>
+
+<body>
+<style>
+  * {
+    margin:0;
+    padding:0;
+  }
+  ul li {
+    margin-left:25px;
+  }
+  .edges line {
+    opacity: 0.2;
+    stroke : #aaa;
+  }
+  .edges line.activeTarget {
+    opacity:0.5;
+    stroke: green;
+  }
+  .edges line.activeSource {
+    opacity:0.5;
+    stroke: red;
+  }
+</style>
+<!-- Load d3.js -->
+<div id="info" style="border:1px solid black;padding:10px;float:right;width:400px;">
+  <div id="nodeinfo"></div>
+  <div id="rules"></div>
+</div>
+<svg width="1200" height="800" style="border:1px solid red" id="network"></svg>
+
+<script src="d3.v4.js"></script>
+<script src="out.js"></script>
+<script>
+// create graph
+var graph = {
+  nodes : [],
+  links : [],
+  rules : []
+}
+products.map(function(p){
+  graph.nodes.push({
+    id : p.product_id,
+    name : p.product_id,
+    group : p.group_0,
+    radius : Math.sqrt(Math.max(5, p.count / 100)),
+  });
+})
+links.map(function(l){
+  if(l.count > 10){
+    graph.links.push({
+      source : l.link[0],
+      target : l.link[1],
+      strokeWidth: Math.sqrt(Math.max(5, l.count / 10)),
+    })
+  }
+})
+var ruleID = 0;
+rules.map(function(r) {
+  for(var j = 0; j < r.antecedents.length; j++){
+    for(var k = 0; k < r.consequents.length; k++){
+      graph.rules.push({
+        ruleID : ruleID,
+        source : r.antecedents[j],
+        target : r.consequents[k],
+        strokeWidth :  Math.ceil(r.support * 500),
+        support : r.support,
+        lift : r.lift,
+        leverage : r.leverage,
+        conviction : r.conviction
+      })
+    }
+  }
+  ruleID++;
+})
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var color = d3.scaleOrdinal(d3.schemeCategory20);
+
+var link = svg.append("g")
+  .attr("class", "edges")
+  .selectAll("line")
+  .data(graph.rules)
+  .enter().append("line")
+  .attr('target', function(d) { return d.target})
+  .attr('source', function(d) { return d.source})
+  .attr('stroke-width', function(d) { return d.strokeWidth })
+
+
+var node = svg.append("g")
+  .attr("class", "nodes")
+  .selectAll("circle")
+  .data(graph.nodes)
+  .enter().append("circle")
+  .attr("label", function(d) {  return d.name; })
+  .attr("r", function(d){  return d.radius; })
+  .style("fill", function(d) { return color(d.group); })
+  .style('stroke', 'black')
+
+
+
+node.on("mouseover", function(e){
+  d3.selectAll('.edges line[target="'+e.id+'"]').classed("activeTarget", true);
+  d3.selectAll('.edges line[source="'+e.id+'"]').classed('activeSource', true);
+
+  var handledRules = [];
+  d3.selectAll('.edges line[source="'+e.id+'"]').each(function(r){
+    if(handledRules.indexOf(r.ruleID) < 0) {
+      handledRules.push(r.ruleID);
+    }
+  });
+  d3.selectAll('.edges line[target="'+e.id+'"]').each(function(r){
+    if(handledRules.indexOf(r.ruleID) < 0) {
+      handledRules.push(r.ruleID);
+    }
+  });
+  console.log(handledRules);
+  document.getElementById('rules').innerHTML = '';
+  var html = `<h3>${e.name}</h3>`;
+  for(var i = 0; i < handledRules.length; i++){
+    var rule = rules[handledRules[i]];
+    console.log(rule);
+    html += `
+      <br/>
+      <strong>Rule ${handledRules[i]} - (${rule.antecedents.join(',')}) => (${rule.consequents.join(',')})</strong>
+      <ul>
+        <li>Support: ${rule['support']}</li>
+        <li>Lift: ${rule['lift']}</li>
+        <li>Confidence: ${rule['confidence']}</li>
+      </ul>
+    `;
+
+  }
+  document.getElementById('rules').innerHTML = html
+
+
+});
+node.on("mouseout", function(e){
+  d3.selectAll('.edges line[target="'+e.id+'"]').classed('activeTarget', false)
+  d3.selectAll('.edges line[source="'+e.id+'"]').classed('activeSource', false)
+});
+
+
+
+var simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; })
+      .strength(function(d) { return Math.sqrt(Math.min(1, d.strokeWidth / 2000))})
+    )
+    .force('charge', d3.forceManyBody()
+        .strength(-200)
+        .theta(1)
+        .distanceMax(300)
+    )
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    .force("collide", d3.forceCollide().radius(function(d) {
+        return d.radius + 20;
+    }).iterations(1))
+    .nodes(graph.nodes).on("tick", ticked)
+    .force("link").links(graph.rules);
+
+function ticked() {
+  link
+    .attr("x1", function(d) { return d.source.x; })
+    .attr("y1", function(d) { return d.source.y; })
+    .attr("x2", function(d) { return d.target.x; })
+    .attr("y2", function(d) { return d.target.y; });
+  node
+   .attr("cx", function (d) {
+     return d.x = Math.max(d.radius, Math.min(width - d.radius, d.x));
+   })
+   .attr("cy", function (d) {
+     return d.y = Math.max(d.radius, Math.min(height - d.radius, d.y));
+   });
+}
+
+
+</script>
+</body>
+</html>

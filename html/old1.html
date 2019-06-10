@@ -1,0 +1,203 @@
+<html>
+<head>
+</head>
+
+<body>
+<script>
+
+</script>
+
+<!-- Load d3.js -->
+<svg width="1200" height="800" style="border:1px solid red" id="network"></svg>
+<script src="d3.v4.js"></script>
+<script src="out.js"></script>
+<script>
+// create graph
+var graph = {
+  nodes : [],
+  links : [],
+  rules : []
+}
+products.map(function(p){
+  graph.nodes.push({
+    id : p.product_id,
+    name : p.product_id,
+    group : p.group_0,
+    radius : Math.sqrt(Math.max(5, p.count) / 100),
+  });
+})
+links.map(function(l){
+  if(l.count > 5) {
+    graph.links.push({
+      source : l.link[0],
+      target : l.link[1],
+      count : l.count,
+      strength: Math.min(1, Math.sqrt(l.count) / 1000),
+      lineWidth : Math.sqrt(l.count) / 10,
+      opacity : Math.min(1, Math.sqrt(l.count) / 100),
+    })
+  }
+})
+for(var i = 0; i < rules.length; i++){
+  for(var j = 0; j < rules[i].antecedents.length; j++){
+    for(var k = 0; k < rules[i].consequents.length; k++){
+      graph.rules.push({
+        ruleID : i,
+        source : rules[i].antecedents[j],
+        target : rules[i].consequents[k],
+        strength : rules[i].support * rules[i].lift,
+        support : rules[i].support,
+        lift : rules[i].lift,
+        leverage : rules[i].leverage,
+        conviction : rules[i].conviction
+      })
+    }
+  }
+}
+
+
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height");
+
+var simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) {
+      return d.id;
+    })
+    /*
+    .strength(function(d){
+        return d.strength;
+      })
+    */
+    )
+    .force("charge", d3.forceManyBody().strength(-400))
+    .force("center", d3.forceCenter(width / 2, height / 2))
+    //.velocityDecay(0.5)
+    .force("collide", d3.forceCollide().radius(function(d) {
+        return d.radius + 1;
+    }).iterations(1))
+
+
+var link = svg.append("g")
+  .style("stroke", "#aaa")
+  .selectAll("line")
+  .data(graph.links)
+  .enter().append("line")
+  .style('opacity', function(d){
+    return d.opacity;
+  })
+  .attr("stroke-width", function(d){
+    return d.lineWidth + 1;
+  });
+var link2 = svg.append("g")
+  .attr('class', 'lines')
+  .style("stroke", "red")
+  .selectAll("line")
+  .data(graph.links)
+  .enter().append("line")
+  .style('opacity', function(d){
+    return 1;
+  })
+  .attr("stroke-width", function(d){
+    return d.lineWidth + 1;
+  });
+
+var node = svg.append("g")
+  .attr("class", "nodes")
+  .selectAll("circle")
+  .data(graph.nodes)
+  .enter().append("circle")
+  .attr("label", function(d) {
+    return d.name;
+  })
+  .attr("r", function(d){
+    return d.radius;
+  })
+  .call(d3.drag()
+    .on("start", dragstarted)
+    .on("drag", dragged)
+    .on("end", dragended)
+  );
+
+var label = svg.append("g")
+    .attr("class", "labels")
+    .selectAll("circle")
+    .data(graph.nodes)
+    .enter().append("text")
+    .attr("class", "label")
+    .style("font-size", "14px").style("fill", "#4393c3")
+    //.style("display", "none")
+    .text(function(d) { return d.name; });
+
+node.on("click", function(e){
+  console.log('clicked node');
+  console.log(e);
+});
+
+label.on("click", function(e){
+  console.log('clicked label');
+  console.log(e);
+  d3.selectAll(e).exit().remove();
+});
+
+simulation
+    .nodes(graph.nodes)
+    .on("tick", ticked);
+
+simulation.force("link")
+    .links(graph.links);
+
+function ticked() {
+  link
+      .attr("x1", function(d) { return d.source.x; })
+      .attr("y1", function(d) { return d.source.y; })
+      .attr("x2", function(d) { return d.target.x; })
+      .attr("y2", function(d) { return d.target.y; });
+  link2
+      .attr("x1", function(d) { return d.source.x; })
+      .attr("y1", function(d) { return d.source.y; })
+      .attr("x2", function(d) { return d.target.x; })
+      .attr("y2", function(d) { return d.target.y; });
+  node
+
+       .style("fill", "#d9d9d9")
+       .style("stroke", "#969696")
+       .style("stroke-width", "1px")
+       .attr("cx", function (d) {
+         return d.x = Math.max(d.radius, Math.min(width - d.radius, d.x));
+       })
+       .attr("cy", function (d) {
+         return d.y = Math.max(d.radius, Math.min(height - d.radius, d.y));
+       });
+       //   .attr("cy", function(d) { return d.y-6; });
+
+  label
+  		.attr("x", function(d) { return d.x - d.radius / 3; })
+      .attr("y", function (d) { return d.y })
+
+}
+
+
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.3).restart()
+  //simulation.fix(d);
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(d) {
+  //simulation.fix(d, d3.event.x, d3.event.y);
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  //simulation.unfix(d);
+  d.fx = null;
+  d.fy = null;
+}
+
+</script>
+</body>
+</html>
